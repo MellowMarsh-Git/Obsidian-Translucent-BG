@@ -4,7 +4,7 @@ An [Obsidian](https://obsidian.md) plugin for **Windows** that applies native Wi
 
 > **Windows only.** Requires Obsidian running as a native desktop app on Windows 10/11 with a version of Electron that supports `BrowserWindow.setBackgroundMaterial`.
 
-> [!note]
+> [!NOTE] Inspiration & Credits
 > This plugin is inspired by and partially based on ideas from [pseudo mica](https://github.com/aaaaalexis/obsidian-pseudo-mica) licensed under MIT.
 ---
 
