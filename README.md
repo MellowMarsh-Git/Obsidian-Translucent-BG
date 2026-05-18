@@ -186,4 +186,4 @@ Output is `main.js` at the project root.
 ---
 
 ## License
-[[LICENSE|MIT license]]
+[MIT license](LICENSE)
