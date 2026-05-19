@@ -1,0 +1,11 @@
+{
+  "id": "translucent-bg",
+  "name": "Translucent BG",
+  "version": "1.0.0",
+  "minAppVersion": "1.6.0",
+  "description": "Translucent window backgrounds for Obsidian on Windows — acrylic blur, mica, and theme-aware tint overlays.",
+  "author": "MellowMarsh",
+  "authorUrl": "https://github.com/MellowMarsh-Git",
+  "isDesktopOnly": true,
+  "platforms": ["win"]
+}
