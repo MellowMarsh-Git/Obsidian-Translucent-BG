@@ -1,6 +1,6 @@
 # Obsidian Translucent BG
 
-An [Obsidian](https://obsidian.md) plugin for **Windows** that applies native Windows 11 background materials (Mica, Acrylic, Tabbed) to the Obsidian window, then layers a theme-aware color tint on top so the effect integrates cleanly with any Obsidian color theme.
+An [Obsidian](https://obsidian.md) plugin for **Windows** that applies native Windows 11 background materials (Mica, Acrylic, Tabbed) to the Obsidian window, with two tinting modes: a built-in plugin-controlled overlay, or full handoff to your Obsidian theme using the standard translucency variable system.
 
 > **Windows only.** Requires Obsidian running as a native desktop app on Windows 10/11 with a version of Electron that supports `BrowserWindow.setBackgroundMaterial`.
 
@@ -28,11 +28,12 @@ An [Obsidian](https://obsidian.md) plugin for **Windows** that applies native Wi
 ## Features
 
 - **Three Windows 11 materials** — Mica, Acrylic, and Tabbed, applied via the native Electron API
-- **Theme-aware tint overlay** — separate color and opacity for light and dark mode; reacts automatically when you switch Obsidian themes
-- **CSS variables for theme authors** — expose `--tbg-light-opacity` and `--tbg-dark-opacity` so theme CSS can integrate seamlessly (see [For Theme Authors](#for-theme-authors))
-- **Extra CSS blur** — optional `backdrop-filter` blur stacked on top of the native material for a stronger frosted-glass look
+- **Two tinting modes** — plugin-managed (color picker + opacity sliders) or theme-managed (defers to your theme's standard opacity variables)
+- **Theme integration** — when theme mode is on, uses `--workspace-background-translucent` with `rgb(from var(--background-secondary) …)` exactly as Obsidian themes expect
+- **Auto theme switching** — tint reacts instantly when you switch between light and dark themes
+- **Extra CSS blur** — optional `backdrop-filter` blur stacked on top of the native material
 - **Cycle command** — keyboard command and ribbon icon to cycle through materials without opening settings
-- **Clean unload** — restoring the window to its default opaque state when the plugin is disabled
+- **Clean unload** — all modifications reversed when the plugin is disabled
 
 ---
 
@@ -64,13 +65,16 @@ Then copy `main.js`, `styles.css`, and `manifest.json` into your vault's plugin 
 
 | Setting | Description |
 |---|---|
-| **Background material** | Choose between Mica, Acrylic, Tabbed, or None |
-| **Light mode tint color** | Hex color of the overlay in light mode |
-| **Light mode tint opacity** | Opacity of the overlay in light mode (0–1) |
-| **Dark mode tint color** | Hex color of the overlay in dark mode |
-| **Dark mode tint opacity** | Opacity of the overlay in dark mode (0–1) |
+| **Background material** | Mica, Acrylic, Tabbed, or None |
+| **Let the theme handle background opacity** | Toggle between plugin-managed and theme-managed tinting (see below) |
+| **Light mode tint color** | Color of the tint overlay in light mode *(plugin-managed only)* |
+| **Light mode tint opacity** | Opacity of the tint in light mode, 0–1 *(plugin-managed only)* |
+| **Dark mode tint color** | Color of the tint overlay in dark mode *(plugin-managed only)* |
+| **Dark mode tint opacity** | Opacity of the tint in dark mode, 0–1 *(plugin-managed only)* |
 | **Extra CSS blur** | Additional `backdrop-filter` blur in pixels (0–40 px) |
 | **Reset to defaults** | Restore all settings to factory defaults |
+
+The color and opacity controls are hidden when **Let the theme handle background opacity** is enabled — they have no effect in that mode.
 
 ---
 
@@ -85,55 +89,58 @@ A ribbon icon (stacked layers) also triggers the cycle command.
 
 ---
 
-## For Theme Authors
+## How it works
 
-The plugin writes the following CSS custom properties to `<body>` at runtime. Theme authors can reference or override these to integrate the translucent background into their palette.
+### Plugin-managed mode (default)
 
-### Available variables
+1. The plugin calls `BrowserWindow.setBackgroundMaterial(material)` via Electron to apply the chosen Windows 11 material to the window.
+2. Obsidian's `is-translucent` class is added to `<body>` and `--workspace-background-translucent` is set to `transparent`, letting the native material show through the workspace area.
+3. A full-screen `<div>` at `z-index: -1` is injected behind all Obsidian UI, carrying a pre-computed `rgba()` tint color based on the settings color pickers and opacity sliders.
+4. A `MutationObserver` watches `<body>` class changes and updates the tint instantly when you switch themes.
 
-```css
---tbg-tint-color       /* rgba() string of the current tint — computed from user settings */
---tbg-extra-blur       /* backdrop-filter blur amount, e.g. "0px" */
---tbg-light-opacity    /* tint opacity in light mode as a percentage, e.g. "35%" */
---tbg-dark-opacity     /* tint opacity in dark mode  as a percentage, e.g. "45%" */
-```
+### Theme-managed mode
 
-### Override opacity from your theme
+When **Let the theme handle background opacity** is enabled:
 
-```css
-:root {
-  --tbg-light-opacity: 40%;
-  --tbg-dark-opacity:  55%;
-}
-```
-
-### Use your theme's background color as the tint
-
-Use the modern CSS relative-color syntax to derive the tint from your own `--background-secondary` instead of the user's chosen hex color:
-
-```css
-body.theme-light.translucent-bg-enabled {
-  --workspace-background-translucent:
-    rgb(from var(--background-secondary) r g b / var(--tbg-light-opacity));
-}
-
-body.theme-dark.translucent-bg-enabled {
-  --workspace-background-translucent:
-    rgb(from var(--background-secondary) r g b / var(--tbg-dark-opacity));
-}
-```
-
-This approach means the tint automatically matches your theme's color palette and the user controls only the opacity via the plugin settings.
+1. The overlay div is hidden — it is not used for tinting in this mode.
+2. `--workspace-background-translucent` is set by the plugin to a `rgb(from …)` expression using `--background-secondary` and the theme's opacity variable:
+   - Light: `rgb(from var(--background-secondary) r g b / var(--translucent-light-opacity, 50%))`
+   - Dark: `rgb(from var(--background-secondary) r g b / var(--translucent-dark-opacity, 50%))`
+3. Obsidian's own `is-translucent` shell reads `--workspace-background-translucent` and applies it as the workspace background — this is the same mechanism Obsidian themes use natively.
+4. The plugin never writes `--translucent-light-opacity` or `--translucent-dark-opacity` as inline styles, so your theme's `:root` declarations always take effect.
 
 ---
 
-## How it works
+## For Theme Authors
 
-1. The plugin calls `BrowserWindow.setBackgroundMaterial(material)` via Electron to set the native Windows material on the app window.
-2. It adds Obsidian's `is-translucent` class to `<body>`, which causes Obsidian's own CSS to use `--workspace-background-translucent` (set to `transparent`) for the workspace area.
-3. A full-screen `<div id="translucent-bg-overlay">` is prepended to `<body>` at `z-index: -1`. This sits between the native material and the Obsidian UI, carrying the tint color and optional extra blur.
-4. A `MutationObserver` watches `<body>` class changes so the tint updates immediately when you switch between light and dark themes.
-5. On unload, all modifications are reversed — the window returns to opaque and all CSS properties are removed.
+### Theme-managed mode variables
+
+When the user enables **Let the theme handle background opacity**, the plugin defers to these standard variables:
+
+```css
+--translucent-light-opacity   /* opacity of the workspace tint in light mode */
+--translucent-dark-opacity    /* opacity of the workspace tint in dark mode  */
+```
+
+Define them on `:root` in your theme and they will control the tint with no further configuration needed from the user:
+
+```css
+:root {
+  --translucent-light-opacity: 50%;
+  --translucent-dark-opacity:  50%;
+}
+```
+
+The tint color is automatically derived from your theme's `--background-secondary`, so it always matches your palette.
+
+### Plugin-managed mode variable
+
+In plugin-managed mode (the default), the plugin writes one variable that can be read by themes or snippets:
+
+```css
+--tbg-tint-color   /* pre-computed rgba() of the current tint */
+--tbg-extra-blur   /* current extra blur amount, e.g. "0px"   */
+```
 
 ---
 
