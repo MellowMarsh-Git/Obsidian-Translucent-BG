@@ -199,9 +199,7 @@ export default class TranslucentBgPlugin extends Plugin {
 
     async loadSettings() {
         const raw = (await this.loadData()) ?? {};
-        // Strip obsolete keys from earlier forks (e.g. "vibrancy" from pseudo-mica).
         const migrated: Partial<TranslucentBgSettings> = { ...raw };
-        if ((raw as any).vibrancy !== undefined) delete (migrated as any).vibrancy;
         this.settings = Object.assign({}, DEFAULT_SETTINGS, migrated);
     }
 
