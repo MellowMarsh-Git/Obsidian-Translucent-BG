@@ -8,78 +8,78 @@
      3. Injects a <div id="translucent-bg-overlay"> as the first child of <body>
      4. Writes CSS custom properties to <body> at runtime
 
-   Custom properties written by the plugin (and available to themes):
-   ─────────────────────────────────────────────────────────────────
-   --tbg-tint-color       rgba() string for the current tint (computed from
-                          --tbg-light-opacity / --tbg-dark-opacity + the chosen
-                          tint hex color in settings)
-   --tbg-extra-blur       extra backdrop-filter blur in px  (default: 0px)
-   --tbg-light-opacity    tint opacity in light mode as a % string (e.g. "35%")
-   --tbg-dark-opacity     tint opacity in dark mode  as a % string (e.g. "45%")
+   ── Plugin-managed mode (default) ────────────────────────────────────────────
+   The plugin owns opacity. It writes a pre-computed rgba() to --tbg-tint-color,
+   which the overlay div reads as its background-color. --workspace-background-
+   translucent is transparent so the overlay and native material show through.
 
-   Theme authors can use these in their own CSS snippets, e.g.:
-   ─────────────────────────────────────────────────────────────────
-   :root {
-     --tbg-light-opacity: 40%;
-     --tbg-dark-opacity:  50%;
-   }
+   Custom properties (plugin-managed):
+     --tbg-tint-color   pre-computed rgba() → overlay background
+     --tbg-extra-blur   px → overlay backdrop-filter blur
 
-   Or with the modern relative-color syntax to tint using the theme's own
-   background-secondary color instead of the user-picked hex:
+   ── Theme-managed mode (.translucent-bg-theme-opacity on body) ───────────────
+   The theme owns opacity via its standard variables:
+     --translucent-light-opacity   (theme defines this on :root, e.g. 50%)
+     --translucent-dark-opacity    (theme defines this on :root, e.g. 50%)
 
-   body.theme-light {
-     --workspace-background-translucent:
-       rgb(from var(--background-secondary) r g b / var(--tbg-light-opacity));
-   }
-   body.theme-dark {
-     --workspace-background-translucent:
-       rgb(from var(--background-secondary) r g b / var(--tbg-dark-opacity));
-   }
+   The plugin sets --workspace-background-translucent using the rgb(from …)
+   relative-color syntax — exactly how Obsidian themes implement translucency:
+
+     Light: rgb(from var(--background-secondary) r g b / var(--translucent-light-opacity))
+     Dark:  rgb(from var(--background-secondary) r g b / var(--translucent-dark-opacity))
+
+   Obsidian's own is-translucent shell reads --workspace-background-translucent
+   for the workspace area, so no overlay div is needed. The overlay is hidden.
+   The plugin never writes --translucent-light-opacity / --translucent-dark-opacity
+   as inline styles, so the theme's :root declarations always win.
    ============================================================================= */
 
 
 /* -----------------------------------------------------------------------------
-   Overlay div
+   Overlay div — plugin-managed opacity (default)
    -----------------------------------------------------------------------------
-   The overlay sits at z-index:-1 so it falls behind the entire Obsidian UI
-   without us touching any existing element's stacking context.
-
-   Because <body> is not a stacking context by default in Obsidian, z-index:-1
-   places the overlay behind the body's paint layer. The render order is:
+   Sits at z-index:-1, behind all Obsidian UI. Render order:
 
      [native material / desktop wallpaper]
        → translucent Electron window
-         → translucent-bg-overlay  (z-index:-1, tint color + optional blur)
-           → Obsidian app UI        (z-index: normal flow)
+         → translucent-bg-overlay  (z-index:-1, tint + optional blur)
+           → Obsidian app UI       (normal flow)
 
-   IMPORTANT: We do NOT set position or z-index on any of Obsidian's own
-   elements. Doing so breaks the layout (window push-down) and hides backgrounds.
+   IMPORTANT: We do NOT touch position or z-index on any Obsidian elements.
+   Doing so breaks layout and collapses element backgrounds.
    ----------------------------------------------------------------------------- */
 .translucent-bg-overlay {
     position: fixed;
     inset: 0;
     z-index: -1;
-    pointer-events: none; /* Never intercept clicks */
+    pointer-events: none;
 
-    /* Tint color computed by the plugin JS from the user's chosen hex + opacity. */
+    /* Plugin-managed mode: pre-computed rgba() written by JS. */
     background-color: var(--tbg-tint-color, transparent);
 
-    /* Optional extra CSS blur stacked on top of the native material. */
+    /* Optional extra blur on top of the native material. */
     backdrop-filter: blur(var(--tbg-extra-blur, 0px));
     -webkit-backdrop-filter: blur(var(--tbg-extra-blur, 0px));
 
-    /* Smooth transition when switching tint colors or themes. */
     transition: background-color 120ms ease-out;
 }
 
 
 /* -----------------------------------------------------------------------------
-   Titlebar — keep it transparent and draggable
+   Theme-managed mode — hide the overlay
    -----------------------------------------------------------------------------
-   Obsidian already sets -webkit-app-region:drag on .titlebar in frameless mode,
-   but we re-assert it here in case another theme or snippet overrides it.
-   Interactive elements inside the titlebar (buttons, inputs) must opt out of
-   dragging so clicks still register.
+   When .translucent-bg-theme-opacity is active the tint comes entirely from
+   --workspace-background-translucent (set by JS using rgb(from …) syntax).
+   Obsidian's is-translucent shell paints that as the workspace background.
+   The overlay div is not needed and must be hidden to avoid double-tinting.
+   ----------------------------------------------------------------------------- */
+body.translucent-bg-theme-opacity .translucent-bg-overlay {
+    display: none;
+}
+
+
+/* -----------------------------------------------------------------------------
+   Titlebar — keep it transparent and draggable
    ----------------------------------------------------------------------------- */
 body.translucent-bg-enabled .titlebar {
     -webkit-app-region: drag;
@@ -96,15 +96,7 @@ body.translucent-bg-enabled .titlebar a {
 
 
 /* -----------------------------------------------------------------------------
-   Workspace root — clear the background so the material shows through
-   -----------------------------------------------------------------------------
-   Obsidian's `is-translucent` class makes the shell use
-   --workspace-background-translucent (which the plugin sets to `transparent`)
-   for the main workspace background. The rule below additionally clears
-   .workspace-split.mod-root which Obsidian does NOT cover via is-translucent.
-
-   We only clear the root-level container; panes, sidebars, modals, code blocks,
-   etc. keep their own themed backgrounds for readability.
+   Workspace root — clear background so material / tint shows through
    ----------------------------------------------------------------------------- */
 body.translucent-bg-enabled .workspace-split.mod-root {
     background-color: transparent !important;
@@ -112,12 +104,7 @@ body.translucent-bg-enabled .workspace-split.mod-root {
 
 
 /* -----------------------------------------------------------------------------
-   "None" material — hide overlay and restore opaque backgrounds
-   -----------------------------------------------------------------------------
-   When the user selects "None" in settings the overlay is hidden. Obsidian's
-   is-translucent class is still present, so --workspace-background-translucent
-   would still be `transparent` — but in practice the Electron window is opaque
-   at that point, so the OS just paints its default window background beneath.
+   "None" material — hide overlay
    ----------------------------------------------------------------------------- */
 body.translucent-bg-enabled[data-tbg-material="none"] .translucent-bg-overlay {
     display: none;
