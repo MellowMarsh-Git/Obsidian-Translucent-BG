@@ -1,6 +1,6 @@
 # Obsidian Translucent BG
 
-An [Obsidian](https://obsidian.md) plugin for **Windows** that applies native Windows 11 background materials (Mica, Acrylic, Tabbed) to the Obsidian window. Unlike a fixed aesthetic theme, Translucent BG is built around **theme compatibility and full customization** — it works with any Obsidian color theme and gives both users and theme authors precise control over how the translucency looks.
+An [Obsidian](https://obsidian.md) plugin for **Windows** that applies native Windows 11 background materials (Mica, Acrylic, Tabbed) to the Obsidian window. Unlike a fixed aesthetic theme, Translucent BG is built around **theme compatibility and full customization**, it works with any Obsidian color theme and gives both users and theme authors precise control over how the translucency looks.
 
 > **Windows only.** Requires Obsidian running as a native desktop app on Windows 10/11 with a version of Electron that supports `BrowserWindow.setBackgroundMaterial`.
 
@@ -8,27 +8,27 @@ An [Obsidian](https://obsidian.md) plugin for **Windows** that applies native Wi
 
 ## Preview
 
-### Plugin-managed tinting — Mica
+### Plugin-managed tinting - Mica
 
 *Mica material, plugin-managed tinting (user picks color and opacity directly in settings).*
 
-![Mica — plugin-managed tinting](docs/images/baselinetheme-mica-theme-managed.png)
+![Mica - plugin-managed tinting](docs/images/baselinetheme-mica-theme-managed.png)
 
-### Plugin-managed tinting — Acrylic
+### Plugin-managed tinting - Acrylic
 
-*Acrylic material, plugin-managed tinting — stronger frosted-glass effect than Mica.*
+*Acrylic material, plugin-managed tinting - stronger frosted-glass effect than Mica.*
 
-![Acrylic — plugin-managed tinting](docs/images/baselinetheme-acrylic-theme-managed.png)
+![Acrylic - plugin-managed tinting](docs/images/baselinetheme-acrylic-theme-managed.png)
 
-### Theme-managed tinting — same material, different color schemes
+### Theme-managed tinting - same material, different color schemes
 
-*Theme-managed mode: the plugin defers tint color and opacity entirely to your Obsidian theme. Swap themes, and the translucency adapts automatically. Shown here with Mica and three different color schemes — default, Catppuccin, and Everforest.*
+*Theme-managed mode: the plugin defers tint color and opacity entirely to your Obsidian theme. Swap themes, and the translucency adapts automatically. Shown here with Mica and three different color schemes - default, Catppuccin, and Everforest.*
 
 | Default | Catppuccin | Everforest |
 |---|---|---|
 | ![Default](docs/images/baselinetheme-mica-theme-managed-default.png) | ![Catppuccin](docs/images/baselinetheme-acrylic-theme-managed-catpuccin.png) | ![Everforest](docs/images/baselinetheme-acrylic-theme-managed-everforest.png) |
 
-### Plugin-managed — Acrylic, dark theme
+### Plugin-managed - Acrylic, dark theme
 
 *Plugin-managed tinting on a dark theme. All three materials are available.*
 
@@ -42,7 +42,7 @@ An [Obsidian](https://obsidian.md) plugin for **Windows** that applies native Wi
 
 ## Two ways to control the tint
 
-Translucent BG ships with two tinting modes. Both produce the same result — the difference is **who controls it**.
+Translucent BG ships with two tinting modes. Both produce the same result - the difference is **who controls it**.
 
 ### Plugin-managed (default)
 
@@ -68,13 +68,13 @@ The plugin defers tint color and opacity entirely to your active Obsidian theme.
 
 ## Features
 
-- **Three Windows 11 materials** — Mica, Acrylic, and Tabbed via the native Electron API
-- **Two tinting modes** — plugin-managed (sliders + color pickers) or theme-managed (theme controls everything)
-- **Theme compatibility** — theme-managed mode produces the exact same `--workspace-background-translucent` expression Obsidian themes use natively, so it integrates without conflict
-- **Auto theme switching** — tint reacts instantly when you switch between light and dark themes
-- **Extra CSS blur** — optional `backdrop-filter` blur stacked on top of the native material
-- **Cycle command** — keyboard command and ribbon icon to cycle through materials without opening settings
-- **Clean unload** — all CSS modifications reversed when the plugin is disabled
+- **Three Windows 11 materials** - Mica, Acrylic, and Tabbed via the native Electron API
+- **Two tinting modes** - plugin-managed (sliders + color pickers) or theme-managed (theme controls everything)
+- **Theme compatibility** - theme-managed mode produces the exact same `--workspace-background-translucent` expression Obsidian themes use natively, so it integrates without conflict
+- **Auto theme switching** - tint reacts instantly when you switch between light and dark themes
+- **Extra CSS blur** - optional `backdrop-filter` blur stacked on top of the native material
+- **Cycle command** - keyboard command and ribbon icon to cycle through materials without opening settings
+- **Clean unload** - all CSS modifications reversed when the plugin is disabled
 
 ---
 
@@ -115,7 +115,7 @@ Then copy `main.js`, `styles.css`, and `manifest.json` into your vault's plugin 
 | **Extra CSS blur** | Additional `backdrop-filter` blur in pixels (0–40 px) |
 | **Reset to defaults** | Restore all settings to factory defaults |
 
-When **Let the theme handle background opacity** is enabled, the color and opacity controls are hidden — they have no effect in that mode.
+When **Let the theme handle background opacity** is enabled, the color and opacity controls are hidden - they have no effect in that mode.
 
 ---
 
@@ -141,11 +141,11 @@ A ribbon icon (stacked layers) also triggers the cycle command.
 
 ### Theme-managed mode
 
-1. The overlay div is hidden — it is not used for tinting here.
+1. The overlay div is hidden - it is not used for tinting here.
 2. `--workspace-background-translucent` is set to the `rgb(from …)` expression that Obsidian's own translucency system uses:
    - Light: `rgb(from var(--background-secondary) r g b / var(--translucent-light-opacity, 50%))`
    - Dark: `rgb(from var(--background-secondary) r g b / var(--translucent-dark-opacity, 50%))`
-3. Obsidian's own `is-translucent` shell reads `--workspace-background-translucent` and applies it as the workspace background — the same way native Obsidian themes work.
+3. Obsidian's own `is-translucent` shell reads `--workspace-background-translucent` and applies it as the workspace background - the same way native Obsidian themes work.
 4. The plugin never writes `--translucent-light-opacity` or `--translucent-dark-opacity` as inline styles, so your theme's `:root` declarations always take effect.
 
 ---
@@ -156,7 +156,7 @@ In theme-managed mode the plugin produces exactly the same workspace background 
 
 ```css
 :root {
-  /* Adjust opacity to taste — 50% is a good starting point */
+  /* Adjust opacity to taste - 50% is a good starting point */
   --translucent-light-opacity: 50%;
   --translucent-dark-opacity:  50%;
 }
