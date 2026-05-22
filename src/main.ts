@@ -12,10 +12,11 @@ interface TranslucentBgSettings {
     lightTintOpacity: number;
     darkTintColor: string;
     darkTintOpacity: number;
-    extraBlur: number;
     followTheme: boolean;
-    /** When true the overlay is hidden; opacity is driven by the theme's :root variables. */
+    /** When true, --workspace-background-translucent opacity is driven by the theme's :root variables. */
     themeHandlesOpacity: boolean;
+    /** When true, the overlay uses --background-secondary + the theme's opacity vars instead of the plugin's color pickers. */
+    themeHandlesTint: boolean;
 }
 
 const DEFAULT_SETTINGS: TranslucentBgSettings = {
@@ -24,9 +25,9 @@ const DEFAULT_SETTINGS: TranslucentBgSettings = {
     lightTintOpacity: 0.35,
     darkTintColor: '#1e1e1e',
     darkTintOpacity: 0.45,
-    extraBlur: 0,
     followTheme: true,
     themeHandlesOpacity: false,
+    themeHandlesTint: false,
 };
 
 const OVERLAY_ID = 'translucent-bg-overlay';
@@ -93,13 +94,12 @@ export default class TranslucentBgPlugin extends Plugin {
 
         document.body.classList.remove('is-translucent');
         document.body.classList.remove('translucent-bg-enabled');
-        document.body.classList.remove('translucent-bg-theme-opacity');
         document.body.removeAttribute('data-tbg-material');
         document.body.style.removeProperty('--workspace-background-translucent');
         document.body.style.removeProperty('--titlebar-background');
         document.body.style.removeProperty('--titlebar-background-focused');
-        document.body.style.removeProperty('--tbg-tint-color');
-        document.body.style.removeProperty('--tbg-extra-blur');
+        document.body.style.removeProperty('--tbg-tint-base');
+        document.body.style.removeProperty('--tbg-tint-opacity');
 
         document.getElementById(OVERLAY_ID)?.remove();
 
@@ -173,39 +173,47 @@ export default class TranslucentBgPlugin extends Plugin {
     }
 
     /**
-     * themeHandlesOpacity=false: bakes rgba() into --tbg-tint-color for the overlay.
-     * themeHandlesOpacity=true:  sets --workspace-background-translucent using the
-     *   theme's --translucent-light/dark-opacity variables; overlay is hidden.
+     * themeHandlesOpacity: sets --workspace-background-translucent from the theme's opacity vars.
+     * themeHandlesTint: sets --tbg-tint-base to --background-secondary.
+     * themeHandlesOpacity: sets --tbg-tint-opacity from the theme's --translucent-light/dark-opacity.
+     * When both are on, also sets --workspace-background-translucent for Obsidian's shell layer.
      */
     updateOverlayStyle() {
         this.themeObserver?.disconnect();
 
         const isDark = document.body.classList.contains('theme-dark');
 
-        document.body.style.setProperty('--tbg-extra-blur', `${this.settings.extraBlur}px`);
+        // --- Tint overlay ---
+        if (this.settings.themeHandlesTint) {
+            document.body.style.setProperty('--tbg-tint-base', 'var(--background-secondary)');
+        } else {
+            const color = isDark ? this.settings.darkTintColor : this.settings.lightTintColor;
+            document.body.style.setProperty('--tbg-tint-base', color);
+        }
 
         if (this.settings.themeHandlesOpacity) {
-            document.body.classList.add('translucent-bg-theme-opacity');
+            const opacityVar = isDark
+                ? 'var(--translucent-dark-opacity, 0.5)'
+                : 'var(--translucent-light-opacity, 0.5)';
+            document.body.style.setProperty('--tbg-tint-opacity', opacityVar);
+        } else {
+            const alpha = isDark ? this.settings.darkTintOpacity : this.settings.lightTintOpacity;
+            document.body.style.setProperty('--tbg-tint-opacity', String(alpha));
+        }
 
+        if (this.settings.themeHandlesOpacity && this.settings.themeHandlesTint) {
             const opacityVar = isDark
                 ? 'var(--translucent-dark-opacity, 50%)'
                 : 'var(--translucent-light-opacity, 50%)';
+            document.body.classList.add('translucent-bg-theme-opacity');
             document.body.style.setProperty(
                 '--workspace-background-translucent',
                 `rgb(from var(--background-secondary) r g b / ${opacityVar})`,
                 'important'
             );
-
-            document.body.style.removeProperty('--tbg-tint-color');
-            document.body.style.removeProperty('--tbg-tint-base');
         } else {
             document.body.classList.remove('translucent-bg-theme-opacity');
             document.body.style.setProperty('--workspace-background-translucent', 'transparent', 'important');
-
-            const color = isDark ? this.settings.darkTintColor   : this.settings.lightTintColor;
-            const alpha = isDark ? this.settings.darkTintOpacity : this.settings.lightTintOpacity;
-            document.body.style.setProperty('--tbg-tint-color', hexToRgba(color, alpha));
-            document.body.style.removeProperty('--tbg-tint-base');
         }
 
         this.resumeThemeObserver();
@@ -294,14 +302,7 @@ class TranslucentBgSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Let the theme handle background opacity')
-            .setDesc(
-                'When enabled, the plugin uses --workspace-background-translucent with ' +
-                'rgb(from var(--background-secondary) r g b / var(--translucent-light/dark-opacity)) — ' +
-                'the same mechanism Obsidian themes use. Your theme controls opacity via ' +
-                '--translucent-light-opacity and --translucent-dark-opacity on :root. ' +
-                'The tint color pickers and opacity sliders below are hidden in this mode. ' +
-                'Disable to use the plugin\'s own color and opacity controls instead.'
-            )
+            .setDesc('Uses --translucent-light-opacity / --translucent-dark-opacity from your theme. Disable to set opacity directly.')
             .addToggle((t) =>
                 t
                     .setValue(this.plugin.settings.themeHandlesOpacity)
@@ -314,23 +315,9 @@ class TranslucentBgSettingTab extends PluginSettingTab {
             );
 
         if (!this.plugin.settings.themeHandlesOpacity) {
-
             new Setting(containerEl)
-                .setName('Light mode tint color')
-                .setDesc('Base color of the overlay in light mode.')
-                .addColorPicker((cp) =>
-                    cp
-                        .setValue(this.plugin.settings.lightTintColor)
-                        .onChange(async (value) => {
-                            this.plugin.settings.lightTintColor = value;
-                            this.plugin.updateOverlayStyle();
-                            await this.plugin.saveSettings();
-                        })
-                );
-
-            new Setting(containerEl)
-                .setName('Light mode tint opacity')
-                .setDesc('Opacity of the tint overlay in light mode (0 = invisible, 1 = fully opaque).')
+                .setName('Light mode background opacity')
+                .setDesc('Opacity of the background in light mode (0 = fully transparent, 1 = fully opaque).')
                 .addSlider((s) =>
                     s
                         .setLimits(0, 1, 0.01)
@@ -344,21 +331,8 @@ class TranslucentBgSettingTab extends PluginSettingTab {
                 );
 
             new Setting(containerEl)
-                .setName('Dark mode tint color')
-                .setDesc('Base color of the overlay in dark mode.')
-                .addColorPicker((cp) =>
-                    cp
-                        .setValue(this.plugin.settings.darkTintColor)
-                        .onChange(async (value) => {
-                            this.plugin.settings.darkTintColor = value;
-                            this.plugin.updateOverlayStyle();
-                            await this.plugin.saveSettings();
-                        })
-                );
-
-            new Setting(containerEl)
-                .setName('Dark mode tint opacity')
-                .setDesc('Opacity of the tint overlay in dark mode (0 = invisible, 1 = fully opaque).')
+                .setName('Dark mode background opacity')
+                .setDesc('Opacity of the background in dark mode (0 = fully transparent, 1 = fully opaque).')
                 .addSlider((s) =>
                     s
                         .setLimits(0, 1, 0.01)
@@ -373,22 +347,46 @@ class TranslucentBgSettingTab extends PluginSettingTab {
         }
 
         new Setting(containerEl)
-            .setName('Extra CSS blur')
-            .setDesc(
-                'Additional CSS backdrop-filter blur (pixels) on top of the native material. ' +
-                'Leave at 0 for a pure native material look.'
-            )
-            .addSlider((s) =>
-                s
-                    .setLimits(0, 40, 1)
-                    .setValue(this.plugin.settings.extraBlur)
-                    .setDynamicTooltip()
+            .setName('Let the theme handle background tint')
+            .setDesc('Uses --background-secondary as the tint color. Disable to choose your own.')
+            .addToggle((t) =>
+                t
+                    .setValue(this.plugin.settings.themeHandlesTint)
                     .onChange(async (value) => {
-                        this.plugin.settings.extraBlur = value;
+                        this.plugin.settings.themeHandlesTint = value;
                         this.plugin.updateOverlayStyle();
                         await this.plugin.saveSettings();
+                        this.display();
                     })
             );
+
+        if (!this.plugin.settings.themeHandlesTint) {
+            new Setting(containerEl)
+                .setName('Light mode tint color')
+                .setDesc('Base color of the tint overlay in light mode.')
+                .addColorPicker((cp) =>
+                    cp
+                        .setValue(this.plugin.settings.lightTintColor)
+                        .onChange(async (value) => {
+                            this.plugin.settings.lightTintColor = value;
+                            this.plugin.updateOverlayStyle();
+                            await this.plugin.saveSettings();
+                        })
+                );
+
+            new Setting(containerEl)
+                .setName('Dark mode tint color')
+                .setDesc('Base color of the tint overlay in dark mode.')
+                .addColorPicker((cp) =>
+                    cp
+                        .setValue(this.plugin.settings.darkTintColor)
+                        .onChange(async (value) => {
+                            this.plugin.settings.darkTintColor = value;
+                            this.plugin.updateOverlayStyle();
+                            await this.plugin.saveSettings();
+                        })
+                );
+        }
 
         new Setting(containerEl)
             .setName('Reset to defaults')
@@ -406,29 +404,4 @@ class TranslucentBgSettingTab extends PluginSettingTab {
                     })
             );
     }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Converts a hex color (#rgb or #rrggbb) and 0–1 alpha into an rgba() string.
- * @example hexToRgba('#1e1e1e', 0.45) // → 'rgba(30, 30, 30, 0.45)'
- */
-function hexToRgba(hex: string, alpha: number): string {
-    const clean = hex.replace('#', '').trim();
-    let r = 0, g = 0, b = 0;
-
-    if (clean.length === 3) {
-        r = parseInt(clean[0] + clean[0], 16);
-        g = parseInt(clean[1] + clean[1], 16);
-        b = parseInt(clean[2] + clean[2], 16);
-    } else if (clean.length === 6) {
-        r = parseInt(clean.substring(0, 2), 16);
-        g = parseInt(clean.substring(2, 4), 16);
-        b = parseInt(clean.substring(4, 6), 16);
-    }
-
-    return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
 }
