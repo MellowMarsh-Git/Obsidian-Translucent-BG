@@ -59,8 +59,8 @@ body.translucent-bg-enabled .workspace-split.mod-root {
 
 
 /* -----------------------------------------------------------------------------
-   "None" material — hide overlay
+   "None" material / fullscreen — overlay opacity is forced to 1 via JS
    ----------------------------------------------------------------------------- */
 body.translucent-bg-enabled[data-tbg-material="none"] .translucent-bg-overlay {
-    display: none;
+    /* JS sets --tbg-tint-opacity: 1 when material is "none" */
 }

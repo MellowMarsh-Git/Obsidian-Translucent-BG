@@ -40,6 +40,7 @@ export default class TranslucentBgPlugin extends Plugin {
     settings: TranslucentBgSettings;
     electronWindow: any = null;
     private themeObserver: MutationObserver | null = null;
+    private fullscreenHandler: (() => void) | null = null;
 
     async onload() {
         await this.loadSettings();
@@ -62,6 +63,9 @@ export default class TranslucentBgPlugin extends Plugin {
         this.injectOverlay();
         this.updateOverlayStyle();
         this.observeThemeChanges();
+
+        this.fullscreenHandler = () => this.updateOverlayStyle();
+        document.addEventListener('fullscreenchange', this.fullscreenHandler);
 
         this.addCommand({
             id: 'cycle-material',
@@ -105,6 +109,11 @@ export default class TranslucentBgPlugin extends Plugin {
 
         this.themeObserver?.disconnect();
         this.themeObserver = null;
+
+        if (this.fullscreenHandler) {
+            document.removeEventListener('fullscreenchange', this.fullscreenHandler);
+            this.fullscreenHandler = null;
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -182,6 +191,8 @@ export default class TranslucentBgPlugin extends Plugin {
         this.themeObserver?.disconnect();
 
         const isDark = document.body.classList.contains('theme-dark');
+        const isFullscreen = document.body.classList.contains('is-fullscreen') || !!document.fullscreenElement;
+        const forceOpaque = isFullscreen || this.settings.material === 'none';
 
         // --- Tint overlay ---
         if (this.settings.themeHandlesTint) {
@@ -191,7 +202,9 @@ export default class TranslucentBgPlugin extends Plugin {
             document.body.style.setProperty('--tbg-tint-base', color);
         }
 
-        if (this.settings.themeHandlesOpacity) {
+        if (forceOpaque) {
+            document.body.style.setProperty('--tbg-tint-opacity', '1');
+        } else if (this.settings.themeHandlesOpacity) {
             const opacityVar = isDark
                 ? 'var(--translucent-dark-opacity, 0.5)'
                 : 'var(--translucent-light-opacity, 0.5)';
@@ -201,7 +214,10 @@ export default class TranslucentBgPlugin extends Plugin {
             document.body.style.setProperty('--tbg-tint-opacity', String(alpha));
         }
 
-        if (this.settings.themeHandlesOpacity && this.settings.themeHandlesTint) {
+        if (forceOpaque) {
+            document.body.classList.remove('translucent-bg-theme-opacity');
+            document.body.style.setProperty('--workspace-background-translucent', 'transparent', 'important');
+        } else if (this.settings.themeHandlesOpacity && this.settings.themeHandlesTint) {
             const opacityVar = isDark
                 ? 'var(--translucent-dark-opacity, 50%)'
                 : 'var(--translucent-light-opacity, 50%)';
